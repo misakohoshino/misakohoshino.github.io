@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>拒收名單系統 | Final</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --accent: #38bdf8;
+            --danger: #ef4444;
+        }
+        body { font-family: "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; padding-bottom: 80px; }
+        
+        /* 標題 */
+        h1 { text-align: center; margin-bottom: 20px; font-size: 1.5rem; border-bottom: 2px solid var(--card); padding-bottom: 10px; }
+
+        /* 卡片區塊 */
+        .panel { background: var(--card); padding: 20px; border-radius: 12px; border-top: 4px solid var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 20px; }
+        
+        /* 輸入框 */
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.9rem; color: #94a3b8; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 12px; background: #334155; border: 1px solid #475569; color: white; border-radius: 6px; box-sizing: border-box; font-size: 1rem; outline: none; }
+        input:focus { border-color: var(--accent); }
+
+        /* 按鈕 */
+        button { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+        .btn-add { background: var(--accent); color: #0f172a; }
+        .btn-save { background: #22c55e; color: white; }
+        .btn-cancel { background: #64748b; color: white; }
+        .btn-refresh { background: #334155; color: white; width: auto; padding: 8px 15px; font-size: 0.9rem; margin-bottom: 10px; float: right; }
+
+        /* 列表卡片 */
+        .card { background: var(--card); padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 4px solid #94a3b8; position: relative; }
+        .card.loc-北部 { border-left-color: #ef4444; }
+        .card.loc-台中 { border-left-color: #eab308; }
+        .card.loc-高雄 { border-left-color: #22c55e; }
+        
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .card-name { font-size: 1.2rem; font-weight: bold; }
+        .card-badge { background: #334155; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
+        .card-info { color: #cbd5e1; font-size: 0.9rem; }
+        .card-reason { background: rgba(239, 68, 68, 0.15); color: #fca5a5; padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 0.95rem; }
+        
+        .card-actions { margin-top: 12px; text-align: right; border-top: 1px solid #334155; padding-top: 10px; }
+        .btn-sm { width: auto; padding: 5px 12px; font-size: 0.85rem; margin: 0 0 0 5px; }
+
+        /* 彈窗與 Loading */
+        #loading { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); color: white; z-index: 999; display: none; justify-content: center; align-items: center; font-size: 1.2rem; }
+        .modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index: 500; display: none; justify-content: center; align-items: center; }
+        .modal-content { background: var(--card); padding: 25px; width: 90%; max-width: 450px; border-radius: 12px; max-height: 90vh; overflow-y: auto; border: 1px solid #475569; }
+        
+        /* 上傳預覽 */
+        .preview-box img { max-height: 100px; margin-top: 10px; border-radius: 5px; display: none; border: 1px solid #475569; }
+    </style>
+</head>
+<body>
+
+<div id="loading">🔄 處理中...</div>
+
+<div class="container">
+    <h1>🛡️ 拒收名單 <span style="font-size:0.6em; color:#64748b;">Pro</span></h1>
+
+    <!-- 新增區 -->
+    <div class="panel">
+        <h3 style="margin-top:0; color:var(--accent);">✏️ 新增資料</h3>
+        <div class="input-group">
+            <label>日期</label><input type="date" id="inDate">
+        </div>
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1"><label>姓名</label><input type="text" id="inName"></div>
+            <div style="flex:1"><label>MID</label><input type="text" id="inMID"></div>
+        </div>
+        <div class="input-group">
+            <label>地區</label>
+            <select id="inRegion">
+                <option value="北部">北部</option>
+                <option value="台中">台中</option>
+                <option value="高雄">高雄</option>
+            </select>
+        </div>
+        <div class="input-group"><label>原因</label><input type="text" id="inReason"></div>
+        
+        <div class="input-group preview-box">
+            <label>照片 (選填)</label>
+            <button onclick="document.getElementById('inFile').click()" style="background:#334155; color:#cbd5e1;">📸 選擇照片</button>
+            <input type="file" id="inFile" accept="image/*" style="display:none" onchange="handleImg(this, 'inBase64', 'preImg')">
+            <img id="preImg">
+            <input type="hidden" id="inBase64">
+        </div>
+        
+        <button class="btn-add" onclick="submitData('add')">➕ 確認新增</button>
+    </div>
+
+    <!-- 列表區 -->
+    <button class="btn-refresh" onclick="loadData()">🔄 重新整理</button>
+    <input type="text" id="search" placeholder="🔍 搜尋..." onkeyup="render()" style="width:100%; padding:10px; border-radius:20px; border:none; margin-bottom:15px;">
+    
+    <div id="list">
+        <p style="text-align:center; color:#64748b;">正在連線...</p>
+    </div>
+</div>
+
+<!-- 編輯視窗 -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0">📝 修改資料</h3>
+        <input type="hidden" id="editIdx">
+        
+        <label>日期</label><input type="date" id="editDate">
+        <label>地區</label>
+        <select id="editRegion">
+            <option value="北部">北部</option>
+            <option value="台中">台中</option>
+            <option value="高雄">高雄</option>
+        </select>
+        <label>姓名</label><input type="text" id="editName">
+        <label>MID</label><input type="text" id="editMID" readonly style="background:#333; color:#999;">
+        <label>原因</label><input type="text" id="editReason">
+        
+        <div class="preview-box" style="margin-top:10px;">
+            <label>更換照片</label>
+            <button onclick="document.getElementById('editFile').click()" style="background:#334155; color:#cbd5e1;">更換照片</button>
+            <input type="file" id="editFile" accept="image/*" style="display:none" onchange="handleImg(this, 'editBase64', 'editPre')">
+            <img id="editPre">
+            <input type="hidden" id="editBase64">
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn-save" onclick="submitData('edit')">💾 儲存</button>
+            <button class="btn-cancel" onclick="document.getElementById('editModal').style.display='none'">取消</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // =====================================================
+    // ⚠️ 請在此處填入您的 Google Apps Script 網址 (保留引號)
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwRLSGtdGMbIIER36y5J75PbDJKtHoovdgaYJ0DFyWA5GhMFk2E_1mVTNIykRMgCIjS/exec'; 
+    // =====================================================
+
+    let db = [];
+
+    // 啟動時執行
+    window.onload = function() {
+        document.getElementById('inDate').valueAsDate = new Date();
+        
+        if (API_URL.includes('請貼上')) {
+            alert("❌ 請先用記事本打開 HTML 檔案，修改第 166 行的網址！");
+            document.getElementById('list').innerHTML = '<p style="text-align:center;color:red">尚未設定網址</p>';
+        } else {
+            loadData();
+        }
+    };
+
+    // 1. 讀取資料
+    function loadData() {
+        loading(true);
+        fetch(API_URL)
+        .then(res => res.json())
+        .then(json => {
+            loading(false);
+            if(json.status === 'success') {
+                db = json.data;
+                db.sort((a,b) => new Date(b.日期) - new Date(a.日期));
+                render();
+            } else {
+                alert("讀取失敗: " + json.msg);
+            }
+        })
+        .catch(err => {
+            loading(false);
+            alert("無法連線，請檢查網址是否正確。
+錯誤: " + err);
+        });
+    }
+
+    // 2. 送出資料
+    function submitData(mode) {
+        let payload = {};
+        
+        if(mode === 'add') {
+            const name = document.getElementById('inName').value.trim();
+            const mid = document.getElementById('inMID').value.trim();
+            if(!name || !mid) return alert("姓名與 MID 必填");
+
+            payload = {
+                action: 'add',
+                '日期': document.getElementById('inDate').value,
+                '名字': name,
+                'MID': mid,
+                '地區': document.getElementById('inRegion').value,
+                '原因': document.getElementById('inReason').value,
+                '附件': document.getElementById('inBase64').value
+            };
+        } else {
+            payload = {
+                action: 'edit',
+                'rowIndex': document.getElementById('editIdx').value,
+                '日期': document.getElementById('editDate').value,
+                '名字': document.getElementById('editName').value,
+                'MID': document.getElementById('editMID').value,
+                '地區': document.getElementById('editRegion').value,
+                '原因': document.getElementById('editReason').value,
+                '附件': document.getElementById('editBase64').value
+            };
+        }
+
+        loading(true);
+        // 使用 safe mode (text/plain)
+        fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(json => {
+            loading(false);
+            if(json.status === 'success') {
+                alert("✅ 成功！");
+                if(mode==='add') clearForm();
+                else document.getElementById('editModal').style.display='none';
+                loadData();
+            } else {
+                alert("錯誤: " + json.msg);
+            }
+        })
+        .catch(err => {
+            loading(false);
+            // Google有時回傳轉址會被誤判為錯誤
+            alert("⚠️ 連線異常 (資料可能已寫入，請重新整理確認)");
+        });
+    }
+
+    // 3. 渲染列表
+    function render() {
+        const k = document.getElementById('search').value.toLowerCase();
+        const list = document.getElementById('list');
+        list.innerHTML = "";
+
+        const filtered = db.filter(d => String(d.名字).toLowerCase().includes(k) || String(d.MID).includes(k));
+
+        if(filtered.length === 0) {
+            list.innerHTML = "<p style='text-align:center; color:#64748b'>查無資料</p>";
+            return;
+        }
+
+        filtered.forEach((d, i) => {
+            // 找出原始索引 (非常重要，這樣編輯時才不會錯亂)
+            const realIndex = db.indexOf(d);
+
+            let date = d.日期;
+            if(date && date.includes('T')) date = date.split('T')[0];
+
+            let imgBtn = "";
+            if(d.附件 && d.附件.length > 20) {
+                imgBtn = `<button class="btn-sm" style="background:#eab308;color:#0f172a" onclick="showImg('${d.附件}')">📷 照片</button>`;
+            }
+
+            // 傳遞數字索引 (realIndex) 而不是物件，這解決了所有按鈕失靈的問題
+            list.innerHTML += `
+                <div class="card loc-${d.地區}">
+                    <div class="card-header">
+                        <span class="card-name">${d.名字}</span>
+                        <span class="card-badge">${d.地區}</span>
+                    </div>
+                    <div class="card-info">🆔 ${d.MID} | 📅 ${date}</div>
+                    <div class="card-reason">⚠️ ${d.原因}</div>
+                    <div class="card-actions">
+                        ${imgBtn}
+                        <button class="btn-sm" style="background:#38bdf8;color:#0f172a" onclick="openEdit(${realIndex})">✏️ 編輯</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    // 4. 編輯功能
+    function openEdit(index) {
+        const d = db[index];
+        document.getElementById('editIdx').value = d.rowIndex;
+        
+        let date = d.日期;
+        if(date && date.includes('T')) date = date.split('T')[0];
+        
+        document.getElementById('editDate').value = date;
+        document.getElementById('editName').value = d.名字;
+        document.getElementById('editMID').value = d.MID;
+        document.getElementById('editRegion').value = d.地區;
+        document.getElementById('editReason').value = d.原因;
+        
+        // 重置圖片欄位
+        document.getElementById('editBase64').value = '';
+        document.getElementById('editPre').style.display = 'none';
+        
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    function clearForm() {
+        document.getElementById('inName').value = '';
+        document.getElementById('inMID').value = '';
+        document.getElementById('inReason').value = '';
+        document.getElementById('inBase64').value = '';
+        document.getElementById('preImg').style.display = 'none';
+        document.getElementById('inFile').value = '';
+    }
+
+    function handleImg(input, valId, imgId) {
+        const f = input.files[0];
+        if(!f) return;
+        const r = new FileReader();
+        r.onload = function(e) {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = function() {
+                const c = document.createElement('canvas');
+                const ctx = c.getContext('2d');
+                const max=800;
+                let w=img.width, h=img.height;
+                if(w>max){h*=max/w;w=max;}
+                c.width=w; c.height=h;
+                ctx.drawImage(img,0,0,w,h);
+                const res = c.toDataURL('image/jpeg', 0.6);
+                document.getElementById(valId).value = res;
+                const p = document.getElementById(imgId);
+                p.src = res; p.style.display = 'block';
+            }
+        }
+        r.readAsDataURL(f);
+    }
+
+    function showImg(src) {
+        const w = window.open("");
+        w.document.write(`<img src="${src}" style="width:100%">`);
+    }
+
+    function loading(show) {
+        document.getElementById('loading').style.display = show ? 'flex' : 'none';
+    }
+</script>
+</body>
+</html>
